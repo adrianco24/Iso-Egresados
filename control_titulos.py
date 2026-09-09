@@ -10,6 +10,8 @@ Genera un Excel de salida con:
   - Detalle_Match: todos los cruces encontrados entre SIU y SICER.
   - Sin_Match_SICER: solicitudes de SIU para las que no se encontro un
     registro correspondiente en SICER (por DNI + titulo equivalente).
+  - Demorados: tramites que todavia no son "Diplomado", ordenados por
+    dias_totales_tramite descendente (los mas demorados primero).
 
 Uso:
     python control_titulos.py
@@ -39,14 +41,15 @@ def find_csv_path() -> Path:
 
 def build_report():
     csv_path = find_csv_path()
-    alertas, detalle, sin_match = build_dataframes(TITULOS_PATH, csv_path, SICER_PATH)
-    excel_bytes = dataframes_to_excel_bytes(alertas, detalle, sin_match)
+    alertas, detalle, sin_match, demorados = build_dataframes(TITULOS_PATH, csv_path, SICER_PATH)
+    excel_bytes = dataframes_to_excel_bytes(alertas, detalle, sin_match, demorados)
     OUTPUT_PATH.write_bytes(excel_bytes)
 
     print(f"Reporte generado: {OUTPUT_PATH}")
     print(f"  Alertas encontradas: {len(alertas)}")
     print(f"  Cruces totales:      {len(detalle)}")
     print(f"  Sin match en SICER:  {len(sin_match)}")
+    print(f"  Demorados (>100 dias): {int(demorados['alerta_demora'].sum())} de {len(demorados)}")
 
 
 if __name__ == "__main__":

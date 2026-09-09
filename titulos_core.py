@@ -26,6 +26,9 @@ REQUISITO_SIU_POR_ESTADO_SICER = {
     "Finalizado": (_ORDEN_DIPLOMADO, ESTADO_DIPLOMADO_SIU),
 }
 
+# a partir de cuantos dias sin terminar un tramite se considera "demorado"
+UMBRAL_DIAS_DEMORA = 100
+
 COLS_ORDER = [
     "dni",
     "apellido_nombres",
@@ -119,7 +122,7 @@ def load_sicer(sicer_source, titulos_validos: set) -> pd.DataFrame:
 
 
 def build_dataframes(titulos_source, csv_source, sicer_source):
-    """Devuelve (alertas, detalle, sin_match) a partir de las 3 fuentes."""
+    """Devuelve (alertas, detalle, sin_match, demorados) a partir de las 3 fuentes."""
     titulos_map = load_titulos_map(titulos_source)
     titulos_validos = {t for titulos in titulos_map.values() for t in titulos}
     siu = load_siu_estado_actual(csv_source, titulos_map)
@@ -161,15 +164,25 @@ def build_dataframes(titulos_source, csv_source, sicer_source):
     detalle = detalle.drop(columns=["estado_siu_esperado"])[COLS_ORDER]
     alertas = alertas[COLS_ORDER_ALERTAS]
 
-    return alertas, detalle, sin_match
+    # tramites que todavia no terminaron (no son "Diplomado") ordenados por
+    # cuantos dias llevan en tramite, para ver cuales son los mas demorados
+    demorados = pd.concat([detalle, sin_match], ignore_index=True)
+    demorados = demorados[demorados["estado_siu"] != ESTADO_DIPLOMADO_SIU].copy()
+    demorados["alerta_demora"] = demorados["dias_totales_tramite"] >= UMBRAL_DIAS_DEMORA
+    demorados = demorados.sort_values("dias_totales_tramite", ascending=False, na_position="last")
+
+    return alertas, detalle, sin_match, demorados
 
 
-def dataframes_to_excel_bytes(alertas: pd.DataFrame, detalle: pd.DataFrame, sin_match: pd.DataFrame) -> bytes:
+def dataframes_to_excel_bytes(
+    alertas: pd.DataFrame, detalle: pd.DataFrame, sin_match: pd.DataFrame, demorados: pd.DataFrame
+) -> bytes:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         alertas.to_excel(writer, sheet_name="Alertas", index=False)
         detalle.to_excel(writer, sheet_name="Detalle_Match", index=False)
         sin_match.to_excel(writer, sheet_name="Sin_Match_SICER", index=False)
+        demorados.to_excel(writer, sheet_name="Demorados", index=False)
 
     buffer.seek(0)
     styled = _style_workbook(buffer)
@@ -196,6 +209,14 @@ def _style_workbook(buffer: io.BytesIO) -> bytes:
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
                     cell.fill = alert_fill
+        if name == "Demorados":
+            headers = [c.value for c in ws[1]]
+            col_idx = headers.index("alerta_demora") + 1 if "alerta_demora" in headers else None
+            if col_idx:
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                    if row[col_idx - 1].value:
+                        for cell in row:
+                            cell.fill = alert_fill
 
     out = io.BytesIO()
     wb.save(out)

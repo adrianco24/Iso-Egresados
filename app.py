@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from titulos_core import build_dataframes, dataframes_to_excel_bytes
+from titulos_core import UMBRAL_DIAS_DEMORA, build_dataframes, dataframes_to_excel_bytes
 
 BASE_DIR = Path(__file__).resolve().parent
 TITULOS_PATH_DEFAULT = BASE_DIR / "titulos.xlsx"
@@ -77,23 +77,27 @@ if procesar:
     else:
         with st.spinner("Procesando..."):
             try:
-                alertas, detalle, sin_match = build_dataframes(titulos_source, csv_file, sicer_file)
+                alertas, detalle, sin_match, demorados = build_dataframes(titulos_source, csv_file, sicer_file)
             except Exception as exc:  # noqa: BLE001 - mostrar error al usuario
                 st.error(f"Ocurrió un error al procesar los archivos: {exc}")
             else:
                 st.session_state["alertas"] = alertas
                 st.session_state["detalle"] = detalle
                 st.session_state["sin_match"] = sin_match
+                st.session_state["demorados"] = demorados
 
 if "detalle" in st.session_state:
     alertas: pd.DataFrame = st.session_state["alertas"]
     detalle: pd.DataFrame = st.session_state["detalle"]
     sin_match: pd.DataFrame = st.session_state["sin_match"]
+    demorados: pd.DataFrame = st.session_state["demorados"]
+    n_demorados = int(demorados["alerta_demora"].sum())
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Alertas", len(alertas))
     col2.metric("Cruces totales", len(detalle))
     col3.metric("Sin match en SICER", len(sin_match))
+    col4.metric(f"Demorados (>{UMBRAL_DIAS_DEMORA} días)", n_demorados)
 
     if len(alertas) > 0:
         st.error(
@@ -103,7 +107,13 @@ if "detalle" in st.session_state:
     else:
         st.success("No se encontraron alertas: SIU está al día con SICER.")
 
-    excel_bytes = dataframes_to_excel_bytes(alertas, detalle, sin_match)
+    if n_demorados > 0:
+        st.warning(
+            f"⏳ Hay {n_demorados} trámite(s) sin finalizar con más de {UMBRAL_DIAS_DEMORA} días "
+            "en trámite. Revisá la pestaña 'Demorados'."
+        )
+
+    excel_bytes = dataframes_to_excel_bytes(alertas, detalle, sin_match, demorados)
     st.download_button(
         "Descargar reporte Excel",
         data=excel_bytes,
@@ -111,8 +121,8 @@ if "detalle" in st.session_state:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-    tab_alertas, tab_detalle, tab_sin_match = st.tabs(
-        ["Alertas", "Detalle_Match", "Sin_Match_SICER"]
+    tab_alertas, tab_detalle, tab_sin_match, tab_demorados = st.tabs(
+        ["Alertas", "Detalle_Match", "Sin_Match_SICER", "Demorados"]
     )
     with tab_alertas:
         if len(alertas) > 0:
@@ -140,5 +150,23 @@ if "detalle" in st.session_state:
     with tab_sin_match:
         download_csv_button(sin_match, "Descargar Sin_Match_SICER (CSV)", "sin_match_sicer.csv", key="csv_sin_match")
         st.dataframe(safe_for_display(sin_match), width="stretch")
+    with tab_demorados:
+        st.caption(
+            f"Trámites que todavía no llegaron a 'Diplomado', ordenados por días totales "
+            f"de trámite (los más demorados primero). Se marcan en rojo los que superan "
+            f"{UMBRAL_DIAS_DEMORA} días."
+        )
+        top_20 = demorados.head(20).set_index("apellido_nombres")["dias_totales_tramite"]
+        st.subheader("Top 20 trámites más demorados")
+        st.bar_chart(top_20)
+
+        download_csv_button(demorados, "Descargar Demorados (CSV)", "demorados.csv", key="csv_demorados")
+        st.dataframe(
+            safe_for_display(demorados).style.apply(
+                lambda row: ["background-color: #ffc7ce" if row["alerta_demora"] else "" for _ in row],
+                axis=1,
+            ),
+            width="stretch",
+        )
 else:
     st.info("Cargá los archivos en el panel de la izquierda y presioná 'Procesar'.")
