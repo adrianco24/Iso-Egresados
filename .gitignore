@@ -1,0 +1,13 @@
+# Datos con informacion personal (DNI, nombres) - nunca subir a un repo publico
+data-*.csv
+sicer consulta.xls
+sicer*.xls
+control_titulos_sicer_vs_siu.xlsx
+
+# Entorno / cache
+.venv/
+__pycache__/
+*.pyc
+
+# Streamlit
+.streamlit/secrets.toml
