@@ -34,17 +34,17 @@ COLS_ORDER = [
     "dni",
     "apellido_nombres",
     "propuesta_nombre",
-    "titulo_sicer",
     "nro_solicitud",
-    "nro_solicitud_sicer",
     "fecha_inicio_tramite",
     "estado_siu",
     "fecha_ultimo_cambio_siu",
-    "estado_sicer",
-    "fecha_sicer",
     "dias_totales_tramite",
     "dias_habiles_tramite",
     "nro_expediente_descr",
+    "titulo_sicer",
+    "nro_solicitud_sicer",
+    "estado_sicer",
+    "fecha_sicer",
 ]
 
 COLS_ORDER_ALERTAS = COLS_ORDER + ["estado_siu_esperado"]
