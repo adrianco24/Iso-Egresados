@@ -10,6 +10,7 @@ logica tanto desde la linea de comandos como desde una interfaz web.
 import io
 import re
 
+import numpy as np
 import pandas as pd
 from openpyxl.styles import Font, PatternFill
 
@@ -41,6 +42,7 @@ COLS_ORDER = [
     "estado_sicer",
     "fecha_sicer",
     "dias_totales_tramite",
+    "dias_habiles_tramite",
     "nro_expediente_descr",
 ]
 
@@ -57,6 +59,22 @@ def _orden_siu(estado_siu: str) -> int:
         return _ORDEN_DIPLOMADO
     match = re.match(r"(\d+)", str(estado_siu))
     return int(match.group(1)) if match else -1
+
+
+def _dias_habiles(fecha_inicio: pd.Series, dias_corridos: pd.Series) -> pd.Series:
+    """Dias habiles (sin contar sabados/domingos) entre el inicio del tramite
+    y la fecha de referencia usada para calcular dias_totales_tramite."""
+    inicio = pd.to_datetime(fecha_inicio, errors="coerce")
+    referencia = inicio + pd.to_timedelta(dias_corridos, unit="D", errors="coerce")
+
+    def _contar(i, r):
+        if pd.isna(i) or pd.isna(r):
+            return None
+        return int(np.busday_count(i.date(), r.date()))
+
+    return pd.Series(
+        [_contar(i, r) for i, r in zip(inicio, referencia)], index=fecha_inicio.index
+    )
 
 
 def load_titulos_map(titulos_source) -> dict:
@@ -92,10 +110,15 @@ def load_siu_estado_actual(csv_source, titulos_map: dict) -> pd.DataFrame:
             "nro_expediente_descr",
             "fecha",
             "estado_nuevo",
+            "fecha_inicio_tramite",
             "dias_totales_tramite",
         ],
     ].rename(columns={"fecha": "fecha_ultimo_cambio_siu", "estado_nuevo": "estado_siu"})
     actual["estado_siu"] = actual["estado_siu"].fillna("Sin estado registrado (recien solicitado)")
+    actual["dias_habiles_tramite"] = _dias_habiles(
+        actual["fecha_inicio_tramite"], actual["dias_totales_tramite"]
+    )
+    actual = actual.drop(columns=["fecha_inicio_tramite"])
 
     # cada propuesta puede corresponder a mas de un titulo SICER (ambiguo)
     actual["titulo_candidato"] = actual["propuesta_nombre"].map(

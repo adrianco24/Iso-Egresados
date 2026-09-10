@@ -156,8 +156,10 @@ if "detalle" in st.session_state:
             f"de trámite (los más demorados primero). Se marcan en rojo los que superan "
             f"{UMBRAL_DIAS_DEMORA} días."
         )
-        top_20 = demorados.head(20).set_index("apellido_nombres")["dias_totales_tramite"]
-        st.subheader("Top 20 trámites más demorados")
+        top_20 = demorados.head(20).set_index("apellido_nombres")[
+            ["dias_totales_tramite", "dias_habiles_tramite"]
+        ]
+        st.subheader("Top 20 trámites más demorados (corridos vs hábiles)")
         st.bar_chart(top_20)
 
         download_csv_button(demorados, "Descargar Demorados (CSV)", "demorados.csv", key="csv_demorados")
