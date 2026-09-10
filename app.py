@@ -14,6 +14,7 @@ from titulos_core import UMBRAL_DIAS_DEMORA, build_dataframes, dataframes_to_exc
 
 BASE_DIR = Path(__file__).resolve().parent
 TITULOS_PATH_DEFAULT = BASE_DIR / "titulos.xlsx"
+DIAS_PATH_DEFAULT = BASE_DIR / "Dias.xlsx"
 
 
 def safe_for_display(df: pd.DataFrame) -> pd.DataFrame:
@@ -77,7 +78,9 @@ if procesar:
     else:
         with st.spinner("Procesando..."):
             try:
-                alertas, detalle, sin_match, demorados = build_dataframes(titulos_source, csv_file, sicer_file)
+                alertas, detalle, sin_match, demorados = build_dataframes(
+                    titulos_source, csv_file, sicer_file, DIAS_PATH_DEFAULT
+                )
             except Exception as exc:  # noqa: BLE001 - mostrar error al usuario
                 st.error(f"Ocurrió un error al procesar los archivos: {exc}")
             else:

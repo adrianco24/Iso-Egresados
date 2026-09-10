@@ -61,7 +61,15 @@ def _orden_siu(estado_siu: str) -> int:
     return int(match.group(1)) if match else -1
 
 
-def _dias_habiles(fecha_inicio: pd.Series, dias_corridos: pd.Series) -> pd.Series:
+def load_dias_no_laborables(dias_source) -> np.ndarray:
+    dias = pd.read_excel(dias_source)
+    dias["Dias"] = pd.to_datetime(dias["Dias"], errors="coerce")
+    return dias["Dias"].dropna().dt.strftime("%Y-%m-%d").to_numpy(dtype="datetime64[D]")
+
+
+def _dias_habiles(
+    fecha_inicio: pd.Series, dias_corridos: pd.Series, dias_no_laborables: np.ndarray
+) -> pd.Series:
     """Dias habiles (sin contar sabados/domingos) entre el inicio del tramite
     y la fecha de referencia usada para calcular dias_totales_tramite."""
     inicio = pd.to_datetime(fecha_inicio, errors="coerce")
@@ -70,7 +78,7 @@ def _dias_habiles(fecha_inicio: pd.Series, dias_corridos: pd.Series) -> pd.Serie
     def _contar(i, r):
         if pd.isna(i) or pd.isna(r):
             return None
-        return int(np.busday_count(i.date(), r.date()))
+        return int(np.busday_count(i.date(), r.date(), holidays=dias_no_laborables))
 
     return pd.Series(
         [_contar(i, r) for i, r in zip(inicio, referencia)], index=fecha_inicio.index
@@ -88,7 +96,9 @@ def load_titulos_map(titulos_source) -> dict:
     return mapping
 
 
-def load_siu_estado_actual(csv_source, titulos_map: dict) -> pd.DataFrame:
+def load_siu_estado_actual(
+    csv_source, titulos_map: dict, dias_no_laborables: np.ndarray
+) -> pd.DataFrame:
     df = pd.read_csv(csv_source, encoding="utf-8")
     df["dni"] = extract_dni(df["tipo_nro_documento"])
     df["propuesta_nombre"] = df["propuesta_nombre"].str.strip().str.upper()
@@ -116,7 +126,9 @@ def load_siu_estado_actual(csv_source, titulos_map: dict) -> pd.DataFrame:
     ].rename(columns={"fecha": "fecha_ultimo_cambio_siu", "estado_nuevo": "estado_siu"})
     actual["estado_siu"] = actual["estado_siu"].fillna("Sin estado registrado (recien solicitado)")
     actual["dias_habiles_tramite"] = _dias_habiles(
-        actual["fecha_inicio_tramite"], actual["dias_totales_tramite"]
+        actual["fecha_inicio_tramite"],
+        actual["dias_totales_tramite"],
+        dias_no_laborables,
     )
     actual = actual.drop(columns=["fecha_inicio_tramite"])
 
@@ -144,11 +156,12 @@ def load_sicer(sicer_source, titulos_validos: set) -> pd.DataFrame:
     )
 
 
-def build_dataframes(titulos_source, csv_source, sicer_source):
+def build_dataframes(titulos_source, csv_source, sicer_source, dias_source):
     """Devuelve (alertas, detalle, sin_match, demorados) a partir de las 3 fuentes."""
     titulos_map = load_titulos_map(titulos_source)
     titulos_validos = {t for titulos in titulos_map.values() for t in titulos}
-    siu = load_siu_estado_actual(csv_source, titulos_map)
+    dias_no_laborables = load_dias_no_laborables(dias_source)
+    siu = load_siu_estado_actual(csv_source, titulos_map, dias_no_laborables)
     sicer = load_sicer(sicer_source, titulos_validos)
 
     merged = siu.merge(

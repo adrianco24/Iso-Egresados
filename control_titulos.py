@@ -29,6 +29,7 @@ from titulos_core import build_dataframes, dataframes_to_excel_bytes
 BASE_DIR = Path(__file__).resolve().parent
 TITULOS_PATH = BASE_DIR / "titulos.xlsx"
 SICER_PATH = BASE_DIR / "sicer consulta.xls"
+DIAS_PATH = BASE_DIR / "Dias.xlsx"
 OUTPUT_PATH = BASE_DIR / "control_titulos_sicer_vs_siu.xlsx"
 
 
@@ -41,7 +42,9 @@ def find_csv_path() -> Path:
 
 def build_report():
     csv_path = find_csv_path()
-    alertas, detalle, sin_match, demorados = build_dataframes(TITULOS_PATH, csv_path, SICER_PATH)
+    alertas, detalle, sin_match, demorados = build_dataframes(
+      TITULOS_PATH, csv_path, SICER_PATH, DIAS_PATH
+    )
     excel_bytes = dataframes_to_excel_bytes(alertas, detalle, sin_match, demorados)
     OUTPUT_PATH.write_bytes(excel_bytes)
 
