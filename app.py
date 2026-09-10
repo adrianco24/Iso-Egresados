@@ -39,12 +39,76 @@ def download_csv_button(df: pd.DataFrame, label: str, file_name: str, key: str):
         key=key,
     )
 
+
+def render_kpi(label: str, value: int, detail: str, tone: str):
+    st.markdown(
+        f"""
+        <div class="kpi-card kpi-{tone}">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-detail">{detail}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 st.set_page_config(page_title="Control de Titulos SIU vs SICER", layout="wide")
 st.title("Control de Titulos: SIU Guaraní vs SICER")
 st.caption(
     "Sube el reporte CSV de SIU Guaraní y el reporte de SICER (xls) para ver en que "
     "estado se encuentra cada trámite y detectar casos donde SICER ya marcó "
     "'Finalizado' pero SIU todavía no figura como 'Diplomado'."
+)
+st.markdown(
+    """
+    <style>
+    .kpi-card {
+        min-height: 142px;
+        padding: 20px 22px 17px;
+        border: 1px solid #dce3ea;
+        border-top: 5px solid #52718a;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 3px 10px rgba(27, 49, 65, 0.07);
+    }
+    .kpi-label {
+        color: #52616d;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+    .kpi-value {
+        color: #182b39;
+        font-size: 2.35rem;
+        font-weight: 800;
+        line-height: 1.15;
+        margin-top: 10px;
+    }
+    .kpi-detail {
+        color: #71808b;
+        font-size: 0.78rem;
+        margin-top: 7px;
+    }
+    .kpi-red { border-top-color: #c64b4b; }
+    .kpi-red .kpi-value { color: #a63232; }
+    .kpi-blue { border-top-color: #3f789d; }
+    .kpi-amber { border-top-color: #c8922e; }
+    .kpi-amber .kpi-value { color: #9b6a0e; }
+    .kpi-orange { border-top-color: #d16c35; }
+    .kpi-orange .kpi-value { color: #ad4f1d; }
+    .summary-strip {
+        margin: 18px 0 24px;
+        padding: 13px 17px;
+        border-left: 4px solid #3f789d;
+        background: #edf5f8;
+        color: #294657;
+        font-size: 0.91rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 with st.sidebar:
@@ -105,10 +169,26 @@ if "detalle" in st.session_state:
     n_demorados = int(demorados["alerta_demora"].sum())
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Alertas", len(alertas))
-    col2.metric("Cruces totales", len(detalle))
-    col3.metric("Sin match en SICER", len(sin_match))
-    col4.metric(f"Demorados (≥{UMBRAL_DIAS_DEMORA} días hábiles)", n_demorados)
+    with col1:
+        render_kpi("Alertas", len(alertas), "SICER avanzó y SIU no acompañó", "red")
+    with col2:
+        render_kpi("Cruces totales", len(detalle), "Trámites encontrados en ambos reportes", "blue")
+    with col3:
+        render_kpi("Sin match en SICER", len(sin_match), "Solicitudes para revisar", "amber")
+    with col4:
+        render_kpi(
+            f"Demorados (≥{UMBRAL_DIAS_DEMORA} días hábiles)",
+            n_demorados,
+            "Trámites aún no finalizados",
+            "orange",
+        )
+
+    st.markdown(
+        f'<div class="summary-strip"><strong>Lectura rápida:</strong> '
+        f'{len(alertas)} alertas de actualización, {n_demorados} trámites demorados y '
+        f'{len(sin_match)} solicitudes sin correspondencia en SICER.</div>',
+        unsafe_allow_html=True,
+    )
 
     if len(alertas) > 0:
         st.error(
