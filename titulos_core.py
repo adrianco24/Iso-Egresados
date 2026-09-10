@@ -37,6 +37,7 @@ COLS_ORDER = [
     "titulo_sicer",
     "nro_solicitud",
     "nro_solicitud_sicer",
+    "fecha_inicio_tramite",
     "estado_siu",
     "fecha_ultimo_cambio_siu",
     "estado_sicer",
@@ -130,7 +131,6 @@ def load_siu_estado_actual(
         actual["dias_totales_tramite"],
         dias_no_laborables,
     )
-    actual = actual.drop(columns=["fecha_inicio_tramite"])
 
     # cada propuesta puede corresponder a mas de un titulo SICER (ambiguo)
     actual["titulo_candidato"] = actual["propuesta_nombre"].map(
@@ -232,12 +232,27 @@ def _style_workbook(buffer: io.BytesIO) -> bytes:
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     alert_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    sicer_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")
+    sicer_columns = {"titulo_sicer", "nro_solicitud_sicer", "estado_sicer", "fecha_sicer"}
 
     for name in wb.sheetnames:
         ws = wb[name]
         for cell in ws[1]:
             cell.font = header_font
             cell.fill = header_fill
+        for cell in ws[1]:
+            if cell.value in sicer_columns:
+                cell.fill = sicer_fill
+                cell.font = Font(bold=True, color="1F4E78")
+        sicer_indexes = {
+            cell.column
+            for cell in ws[1]
+            if cell.value in sicer_columns
+        }
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                if cell.column in sicer_indexes:
+                    cell.fill = sicer_fill
         for col in ws.columns:
             max_len = max((len(str(c.value)) for c in col if c.value is not None), default=10)
             ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 45)
