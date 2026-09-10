@@ -27,8 +27,8 @@ REQUISITO_SIU_POR_ESTADO_SICER = {
     "Finalizado": (_ORDEN_DIPLOMADO, ESTADO_DIPLOMADO_SIU),
 }
 
-# a partir de cuantos dias sin terminar un tramite se considera "demorado"
-UMBRAL_DIAS_DEMORA = 100
+# a partir de cuantos dias habiles sin terminar un tramite se considera "demorado"
+UMBRAL_DIAS_DEMORA = 75
 
 COLS_ORDER = [
     "dni",
@@ -204,7 +204,7 @@ def build_dataframes(titulos_source, csv_source, sicer_source, dias_source):
     # cuantos dias llevan en tramite, para ver cuales son los mas demorados
     demorados = pd.concat([detalle, sin_match], ignore_index=True)
     demorados = demorados[demorados["estado_siu"] != ESTADO_DIPLOMADO_SIU].copy()
-    demorados["alerta_demora"] = demorados["dias_totales_tramite"] >= UMBRAL_DIAS_DEMORA
+    demorados["alerta_demora"] = demorados["dias_habiles_tramite"] >= UMBRAL_DIAS_DEMORA
     demorados = demorados.sort_values("dias_totales_tramite", ascending=False, na_position="last")
 
     return alertas, detalle, sin_match, demorados

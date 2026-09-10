@@ -52,7 +52,7 @@ def build_report():
     print(f"  Alertas encontradas: {len(alertas)}")
     print(f"  Cruces totales:      {len(detalle)}")
     print(f"  Sin match en SICER:  {len(sin_match)}")
-    print(f"  Demorados (>100 dias): {int(demorados['alerta_demora'].sum())} de {len(demorados)}")
+    print(f"  Demorados (>=75 dias habiles): {int(demorados['alerta_demora'].sum())} de {len(demorados)}")
 
 
 if __name__ == "__main__":

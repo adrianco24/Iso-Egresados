@@ -64,9 +64,15 @@ with st.sidebar:
     st.subheader("3. Reporte SICER")
     sicer_file = st.file_uploader("sicer consulta.xls", type=["xls", "xlsx"])
 
+    st.subheader("4. Feriados y vacaciones")
+    dias_file = st.file_uploader("Dias.xlsx (opcional)", type=["xlsx", "xls"])
+    if DIAS_PATH_DEFAULT.exists():
+        st.caption(f"Se usará '{DIAS_PATH_DEFAULT.name}' si no subís otro archivo.")
+
     procesar = st.button("Procesar", type="primary", width="stretch")
 
 titulos_source = titulos_file or (TITULOS_PATH_DEFAULT if usar_default else None)
+dias_source = dias_file or (DIAS_PATH_DEFAULT if DIAS_PATH_DEFAULT.exists() else None)
 
 if procesar:
     if titulos_source is None:
@@ -75,11 +81,13 @@ if procesar:
         st.error("Falta el reporte CSV de SIU Guaraní.")
     elif sicer_file is None:
         st.error("Falta el reporte de SICER.")
+    elif dias_source is None:
+        st.error("Falta el calendario Dias.xlsx con feriados y vacaciones.")
     else:
         with st.spinner("Procesando..."):
             try:
                 alertas, detalle, sin_match, demorados = build_dataframes(
-                    titulos_source, csv_file, sicer_file, DIAS_PATH_DEFAULT
+                    titulos_source, csv_file, sicer_file, dias_source
                 )
             except Exception as exc:  # noqa: BLE001 - mostrar error al usuario
                 st.error(f"Ocurrió un error al procesar los archivos: {exc}")
@@ -100,7 +108,7 @@ if "detalle" in st.session_state:
     col1.metric("Alertas", len(alertas))
     col2.metric("Cruces totales", len(detalle))
     col3.metric("Sin match en SICER", len(sin_match))
-    col4.metric(f"Demorados (>{UMBRAL_DIAS_DEMORA} días)", n_demorados)
+    col4.metric(f"Demorados (≥{UMBRAL_DIAS_DEMORA} días hábiles)", n_demorados)
 
     if len(alertas) > 0:
         st.error(
@@ -112,7 +120,7 @@ if "detalle" in st.session_state:
 
     if n_demorados > 0:
         st.warning(
-            f"⏳ Hay {n_demorados} trámite(s) sin finalizar con más de {UMBRAL_DIAS_DEMORA} días "
+            f"⏳ Hay {n_demorados} trámite(s) sin finalizar con al menos {UMBRAL_DIAS_DEMORA} días hábiles "
             "en trámite. Revisá la pestaña 'Demorados'."
         )
 
@@ -156,8 +164,8 @@ if "detalle" in st.session_state:
     with tab_demorados:
         st.caption(
             f"Trámites que todavía no llegaron a 'Diplomado', ordenados por días totales "
-            f"de trámite (los más demorados primero). Se marcan en rojo los que superan "
-            f"{UMBRAL_DIAS_DEMORA} días."
+            f"de trámite (los más demorados primero). Se marcan en rojo los que alcanzan "
+            f"{UMBRAL_DIAS_DEMORA} días hábiles."
         )
         top_20 = demorados.head(20).set_index("apellido_nombres")[
             ["dias_totales_tramite", "dias_habiles_tramite"]
